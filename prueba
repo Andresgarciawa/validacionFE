@@ -1,0 +1,103 @@
+import logging
+from tkinter import *
+from tkinter import ttk, messagebox
+
+
+class Menu:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Validación de Documentos Enviados")
+        self.root.geometry("500x250")
+
+        # Variable para almacenar el tiempo de ejecución
+        self.tiempo_ejecucion = StringVar()
+        self.tiempo_ejecucion.set("10")  # Valor predeterminado en segundos
+
+        # Frame principal
+        main_frame = ttk.Frame(self.root, padding="20")
+        main_frame.grid(row=0, column=0, sticky=(N, W, E, S))
+
+        # Título
+        ttk.Label(
+            main_frame, 
+            text="Validación de FACT. ELEC",
+            font=('Helvetica', 16, 'bold')
+        ).grid(row=0, column=0, columnspan=2, pady=10)
+    
+        # Campo para el tiempo de ejecución
+        ttk.Label(main_frame, text="Tiempo de Ejecución (segundos):").grid(row=1, column=0, pady=5, sticky=W)
+        ttk.Entry(main_frame, textvariable=self.tiempo_ejecucion, width=10).grid(row=1, column=1, pady=5, sticky=W)
+        
+        # Botón de inicio
+        ttk.Button(
+            main_frame,
+            text="Iniciar Ciclo",
+            command=self.iniciar_ciclo,
+            width=30
+        ).grid(row=4, column=0, columnspan=2, pady=10)
+        
+        # Botón de detener
+        ttk.Button(
+            main_frame,
+            text="Detener Ciclo",
+            command=self.detener_ciclo,
+            width=30
+        ).grid(row=5, column=0, columnspan=2, pady=5)
+
+        # Label de estado
+        self.label_estado = ttk.Label(main_frame, text="Estado: Detenido", font=('Helvetica', 12, 'italic'))
+        self.label_estado.grid(row=6, column=0, columnspan=2, pady=10)
+
+        # Variable de control para el ciclo
+        self.ejecutando = False
+
+    logging.basicConfig(level=logging.INFO, filename="logs/app.log", 
+                    format="%(asctime)s - %(levelname)s - %(message)s")
+
+               
+    def iniciar_ciclo(self):
+        """Inicia el ciclo de ejecución."""
+        if not self.ejecutando:
+            self.ejecutando = True
+            self.label_estado.config(text="Estado: En ejecución")
+            self.ejecutar_ciclo(int(self.tiempo_ejecucion.get()))  # Obtener intervalo en segundos
+
+    def detener_ciclo(self):
+        """Detiene el ciclo de ejecución."""
+        self.ejecutando = False
+        self.label_estado.config(text="Estado: Detenido")
+
+    def ejecutar_ciclo(self, intervalo):
+        """Ciclo que consulta la BD y la API en un intervalo."""
+        if self.ejecutando:
+            # Verificar si el token no ha sido obtenido, pedirlo ahora
+            if not self.token:
+                self.token = self.obtener_token()
+
+            # Consultar base de datos
+            documentos = self.consultar_base_datos()
+            for doc in documentos:
+                id_documento, nombre, estado = doc
+                print(f"Documento en BD: {id_documento}, Nombre: {nombre}, Estado: {estado}")
+
+                # Consultar en la API
+                respuesta_api = self.consultar_api(id_documento, nombre, estado)
+                if respuesta_api:
+                    print(f"Respuesta de API para {id_documento}: {respuesta_api}")
+
+                    # Mostrar error si ocurre
+                    if "error" in respuesta_api:
+                        messagebox.showerror("Error API", respuesta_api["error"])
+                    else:
+                        # Insertar en la API con datos adicionales
+                        self.insertar_en_api(id_documento, nombre, estado)
+
+            # Repetir el ciclo después del intervalo
+            self.label_estado.config(text=f"Esperando {intervalo} segundos para la siguiente consulta")
+            self.root.after(intervalo * 1000, self.ejecutar_ciclo, intervalo)  # Usar after para no bloquear la interfaz
+
+if __name__ == "__main__":
+    # Crear la ventana principal
+    root = Tk()
+    app = Menu(root)
+    root.mainloop()
