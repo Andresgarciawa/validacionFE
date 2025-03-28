@@ -1,0 +1,73 @@
+2025-03-28 15:01:14,573 - INFO - [api_client.py:20] - Intentando obtener el token...
+2025-03-28 15:01:14,678 - INFO - [api_client.py:24] - Código de estado: 200
+2025-03-28 15:01:14,678 - INFO - [api_client.py:25] - Respuesta cruda: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjgzMDEyOTAyNCIsIm5iZiI6MTc0MzE5MjA3NCwiZXhwIjoxNzQzMjc4NDc0LCJpYXQiOjE3NDMxOTIwNzQsImlzcyI6Ik1pc0ZhY3R1cmFzIn0._Ppiai71ZbHqwKTY65NQtR5c3gvErMu45se-KYpZ55w"
+2025-03-28 15:01:14,679 - INFO - [api_client.py:41] - Token obtenido correctamente: eyJhb...pZ55w
+2025-03-28 15:01:14,679 - INFO - [api_client.py:42] - Tiempo de obtención: 0m 0s
+2025-03-28 15:01:15,726 - INFO - [database.py:88] - Conexión exitosa a la segunda base de datos.
+2025-03-28 15:01:16,582 - INFO - [document_processor.py:259] - Se encontraron 1 documentos pendientes
+2025-03-28 15:01:16,582 - WARNING - [document_processor.py:273] - Tipo de documento desconocido: FV . Se usará 'FV' por defecto.
+2025-03-28 15:01:16,583 - INFO - [document_processor.py:277] - Procesando DocumentID:                                                    con tipo de documento: FV 
+2025-03-28 15:01:16,583 - INFO - [api_client.py:70] - Consultando detalles para DocumentID:                                                    con DocumentType: 1
+2025-03-28 15:01:16,647 - ERROR - [api_client.py:81] - Error al consultar DocumentID                                                   : 405 Client Error: Method Not Allowed for url: https://www.misfacturas.com.co/integrationAPI_2/api/GetDocumentStatus?SchemaID=31&DocumentType=1&IDNumber=830129024&DocumentID=++++++++++++++++++++++++++++++++++++++++++++++++++
+2025-03-28 15:01:16,908 - INFO - [document_processor.py:291] - Procesamiento de documentos pendientes completado
+2025-03-28 15:01:17,988 - INFO - [database.py:62] - Conexión exitosa a la primera base de datos.
+2025-03-28 15:01:22,953 - INFO - [email_notifier.py:27] - Correo enviado correctamente: Errores en la base de datos SAP
+2025-03-28 15:01:23,506 - INFO - [database.py:88] - Conexión exitosa a la segunda base de datos.
+2025-03-28 15:01:28,046 - INFO - [email_notifier.py:27] - Correo enviado correctamente: Errores en la base de datos Tabla de Control
+2025-03-28 15:01:28,046 - INFO - [main.py:37] - Proceso finalizado exitosamente.
+2025-03-28 15:05:41,899 - INFO - [api_client.py:20] - Intentando obtener el token...
+2025-03-28 15:05:42,503 - INFO - [api_client.py:24] - Código de estado: 200
+2025-03-28 15:05:42,503 - INFO - [api_client.py:25] - Respuesta cruda: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjgzMDEyOTAyNCIsIm5iZiI6MTc0MzE5MjM0MiwiZXhwIjoxNzQzMjc4NzQyLCJpYXQiOjE3NDMxOTIzNDIsImlzcyI6Ik1pc0ZhY3R1cmFzIn0._TeLXbBF_bWZ8OMBQBQjdV3tNkDIOZ6XvmiObsHT3wU"
+2025-03-28 15:05:42,503 - INFO - [api_client.py:41] - Token obtenido correctamente: eyJhb...HT3wU
+2025-03-28 15:05:42,504 - INFO - [api_client.py:42] - Tiempo de obtención: 0m 0s
+2025-03-28 15:05:43,682 - INFO - [database.py:88] - Conexión exitosa a la segunda base de datos.
+2025-03-28 15:05:44,515 - INFO - [document_processor.py:259] - Se encontraron 1 documentos pendientes
+2025-03-28 15:05:44,515 - WARNING - [document_processor.py:268] - Se encontró un documento sin DocumentID válido. Se omitirá este documento.
+2025-03-28 15:05:44,734 - INFO - [document_processor.py:287] - Procesamiento de documentos pendientes completado
+2025-03-28 15:05:45,771 - INFO - [database.py:62] - Conexión exitosa a la primera base de datos.
+2025-03-28 15:05:49,671 - INFO - [email_notifier.py:27] - Correo enviado correctamente: Errores en la base de datos SAP
+2025-03-28 15:05:50,197 - INFO - [database.py:88] - Conexión exitosa a la segunda base de datos.
+2025-03-28 15:05:54,906 - INFO - [email_notifier.py:27] - Correo enviado correctamente: Errores en la base de datos Tabla de Control
+2025-03-28 15:05:54,906 - INFO - [main.py:37] - Proceso finalizado exitosamente.
+2025-03-28 15:21:31,998 - INFO - [api_client.py:20] - Intentando obtener el token...
+2025-03-28 15:21:32,640 - INFO - [api_client.py:24] - Código de estado: 200
+2025-03-28 15:21:32,642 - INFO - [api_client.py:25] - Respuesta cruda: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjgzMDEyOTAyNCIsIm5iZiI6MTc0MzE5MzI5MiwiZXhwIjoxNzQzMjc5NjkyLCJpYXQiOjE3NDMxOTMyOTIsImlzcyI6Ik1pc0ZhY3R1cmFzIn0.lKjilllpX4gWFJCMVN1N1vVjpnqo9H6B69jZI6Z2k4c"
+2025-03-28 15:21:32,642 - INFO - [api_client.py:41] - Token obtenido correctamente: eyJhb...Z2k4c
+2025-03-28 15:21:32,642 - INFO - [api_client.py:42] - Tiempo de obtención: 0m 0s
+2025-03-28 15:21:33,777 - INFO - [database.py:88] - Conexión exitosa a la segunda base de datos.
+2025-03-28 15:21:34,957 - INFO - [document_processor.py:259] - Se encontraron 1 documentos pendientes
+2025-03-28 15:21:34,958 - WARNING - [document_processor.py:272] - Tipo de documento desconocido: FV . Se usará 'FV' por defecto.
+2025-03-28 15:21:34,958 - INFO - [api_client.py:70] - Consultando detalles para DocumentID:                                                    con DocumentType: 1
+2025-03-28 15:21:35,094 - ERROR - [api_client.py:81] - Error al consultar DocumentID                                                   : 405 Client Error: Method Not Allowed for url: https://www.misfacturas.com.co/integrationAPI_2/api/GetDocumentStatus?SchemaID=31&DocumentType=1&IDNumber=830129024&DocumentID=++++++++++++++++++++++++++++++++++++++++++++++++++
+2025-03-28 15:21:35,299 - INFO - [document_processor.py:293] - Procesamiento de documentos pendientes completado
+2025-03-28 15:21:36,387 - INFO - [database.py:62] - Conexión exitosa a la primera base de datos.
+2025-03-28 15:21:53,914 - INFO - [api_client.py:20] - Intentando obtener el token...
+2025-03-28 15:21:54,044 - INFO - [api_client.py:24] - Código de estado: 200
+2025-03-28 15:21:54,045 - INFO - [api_client.py:25] - Respuesta cruda: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjgzMDEyOTAyNCIsIm5iZiI6MTc0MzE5MzMxMywiZXhwIjoxNzQzMjc5NzEzLCJpYXQiOjE3NDMxOTMzMTMsImlzcyI6Ik1pc0ZhY3R1cmFzIn0.B65BRtKcDMBLEoXMRWVqnLJwRZJOgE9Afaps49W8x34"
+2025-03-28 15:21:54,045 - INFO - [api_client.py:41] - Token obtenido correctamente: eyJhb...W8x34
+2025-03-28 15:21:54,045 - INFO - [api_client.py:42] - Tiempo de obtención: 0m 0s
+2025-03-28 15:21:55,231 - INFO - [database.py:88] - Conexión exitosa a la segunda base de datos.
+2025-03-28 15:21:56,078 - INFO - [document_processor.py:259] - Se encontraron 1 documentos pendientes
+2025-03-28 15:21:56,078 - WARNING - [document_processor.py:272] - Tipo de documento desconocido: FV . Se usará 'FV' por defecto.
+2025-03-28 15:21:56,078 - INFO - [api_client.py:70] - Consultando detalles para DocumentID:                                                    con DocumentType: 1
+2025-03-28 15:21:56,147 - ERROR - [api_client.py:81] - Error al consultar DocumentID                                                   : 405 Client Error: Method Not Allowed for url: https://www.misfacturas.com.co/integrationAPI_2/api/GetDocumentStatus?SchemaID=31&DocumentType=1&IDNumber=830129024&DocumentID=++++++++++++++++++++++++++++++++++++++++++++++++++
+2025-03-28 15:21:56,361 - INFO - [document_processor.py:293] - Procesamiento de documentos pendientes completado
+2025-03-28 15:21:57,501 - INFO - [database.py:62] - Conexión exitosa a la primera base de datos.
+2025-03-28 15:22:02,407 - INFO - [email_notifier.py:27] - Correo enviado correctamente: Errores en la base de datos SAP
+2025-03-28 15:22:02,966 - INFO - [database.py:88] - Conexión exitosa a la segunda base de datos.
+2025-03-28 15:22:07,634 - INFO - [email_notifier.py:27] - Correo enviado correctamente: Errores en la base de datos Tabla de Control
+2025-03-28 15:22:07,634 - INFO - [main.py:37] - Proceso finalizado exitosamente.
+2025-03-28 15:24:28,067 - INFO - [api_client.py:20] - Intentando obtener el token...
+2025-03-28 15:24:28,205 - INFO - [api_client.py:24] - Código de estado: 200
+2025-03-28 15:24:28,205 - INFO - [api_client.py:25] - Respuesta cruda: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6IjgzMDEyOTAyNCIsIm5iZiI6MTc0MzE5MzQ2NywiZXhwIjoxNzQzMjc5ODY3LCJpYXQiOjE3NDMxOTM0NjcsImlzcyI6Ik1pc0ZhY3R1cmFzIn0.CVhgEYgbwT0j1IZx-VaTKhzrGrHAd0bYXZGPH1mTRgw"
+2025-03-28 15:24:28,205 - INFO - [api_client.py:41] - Token obtenido correctamente: eyJhb...mTRgw
+2025-03-28 15:24:28,205 - INFO - [api_client.py:42] - Tiempo de obtención: 0m 0s
+2025-03-28 15:24:29,365 - INFO - [database.py:88] - Conexión exitosa a la segunda base de datos.
+2025-03-28 15:24:30,808 - INFO - [document_processor.py:259] - Se encontraron 1 documentos pendientes
+2025-03-28 15:24:30,808 - WARNING - [document_processor.py:272] - Tipo de documento desconocido: FV . Se usará 'FV' por defecto.
+2025-03-28 15:24:30,809 - ERROR - [document_processor.py:296] - Error general al procesar documentos pendientes: type object 'Settings' has no attribute 'API_SCHEMA_ID'
+2025-03-28 15:24:32,104 - INFO - [database.py:62] - Conexión exitosa a la primera base de datos.
+2025-03-28 15:24:37,124 - INFO - [email_notifier.py:27] - Correo enviado correctamente: Errores en la base de datos SAP
+2025-03-28 15:24:37,691 - INFO - [database.py:88] - Conexión exitosa a la segunda base de datos.
+2025-03-28 15:24:41,110 - INFO - [email_notifier.py:27] - Correo enviado correctamente: Errores en la base de datos Tabla de Control
+2025-03-28 15:24:41,111 - INFO - [main.py:37] - Proceso finalizado exitosamente.

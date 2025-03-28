@@ -1,17 +1,342 @@
 import pyodbc  # type: ignore
-import smtplib
-from email.message import EmailMessage
-import os
-from dotenv import load_dotenv
-import re
-import logging
+import smtplib # Nuevo para enviar correos
+from email.message import EmailMessage # Nuevo para enviar correos
+import os # Nuevo para cargar variables de entorno
+from dotenv import load_dotenv # Nuevo para cargar variables de entorno
+import re # Nuevo para validar correos electrónicos
+import logging # Nuevo para registrar eventos
+import requests # Nuevo para manejar peticiones HTTP
+import time  # Nuevo para medir el tiempo de ejecución
 
 # Configuración del log
 logging.basicConfig(
-    filename='log_validacion.txt',
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # Muestra logs en consola
+        logging.FileHandler('documento_request.log')  # Guarda logs en archivo
+    ]
 )
+
+def obtener_token():
+    start_time = time.time()
+    url = "https://www.misfacturas.com.co/IntegrationAPI_2/api/login"
+    
+    payload = {
+        "username": "830129024", 
+        "password": "830129024"
+    }
+    
+    headers = {"Content-Type": "application/json"}
+    
+    try:
+        logging.info("Intentando obtener el token...")
+        
+        response = requests.post(url, json=payload, headers=headers)
+        
+        logging.info(f"Código de estado: {response.status_code}")
+        logging.info(f"Respuesta cruda: {response.text}")
+        
+        response.raise_for_status()
+        
+        data = response.json()
+        token = data.get("access_token")
+        
+        if not token:
+            logging.error("No se recibió un token válido en la respuesta.")
+            logging.error(f"Respuesta completa: {data}")
+            return None
+        
+        token_mascarado = f"{token[:5]}...{token[-5:]}"
+        elapsed_time = time.time() - start_time
+        minutos, segundos = divmod(int(elapsed_time), 60)
+        
+        logging.info(f"Token obtenido correctamente: {token_mascarado}")
+        logging.info(f"Tiempo de obtención: {minutos}m {segundos}s")
+        
+        return token
+    
+    except requests.RequestException as e:
+        logging.error(f"Error en la solicitud del token: {e}")
+        return None
+    except ValueError as e:
+        logging.error(f"Error al procesar la respuesta JSON: {e}")
+        return None
+
+def obtener_documento(token, document_id):
+    """
+    Consulta los detalles de un documento específico usando la API GetDocument
+    
+    Args:
+        token (str): Token de autenticación
+        document_id (str): ID del documento a consultar
+    
+    Returns:
+        dict: Respuesta de la API o None si hay error
+    """
+    url_base = "https://www.misfacturas.com.co/IntegrationAPI_2/api/GetDocument"
+    
+    params = {
+        "SchemaID": 31,
+        "DocumentType": 1,
+        "IDNumber": "830129024",
+        "DocumentID": document_id
+    }
+    
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        logging.info(f"Consultando detalles para DocumentID: {document_id}")
+        
+        response = requests.get(url_base, params=params, headers=headers)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        logging.info(f"Consulta de documento exitosa para DocumentID: {document_id}")
+        return data
+    
+    except requests.RequestException as e:
+        logging.error(f"Error al consultar DocumentID {document_id}: {e}")
+        return None
+    except ValueError as e:
+        logging.error(f"Error al procesar respuesta JSON para DocumentID {document_id}: {e}")
+        return None
+
+def consultar_estado_documento(token, document_id):
+    """
+    Consulta el estado de un documento específico
+    
+    Args:
+        token (str): Token de autenticación
+        document_id (str): ID del documento a consultar
+    
+    Returns:
+        dict: Respuesta de la API o None si hay error
+    """
+    url_base = "https://www.misfacturas.com.co/integrationAPI_2/api/GetDocumentStatus"
+    
+    params = {
+        "SchemaID": 31,
+        "DocumentType": 1,
+        "IDNumber": "830129024",
+        "DocumentID": document_id
+    }
+    
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        logging.info(f"Consultando estado para DocumentID: {document_id}")
+        
+        response = requests.get(url_base, params=params, headers=headers)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        logging.info(f"Consulta exitosa para DocumentID: {document_id}")
+        return data
+    
+    except requests.RequestException as e:
+        logging.error(f"Error al consultar DocumentID {document_id}: {e}")
+        return None
+    except ValueError as e:
+        logging.error(f"Error al procesar respuesta JSON para DocumentID {document_id}: {e}")
+        return None
+
+def actualizar_estado_documento(cursor, conn, documento):
+    """
+    Actualiza el estado del documento en la tabla de control
+    
+    Args:
+        cursor: Cursor de la base de datos
+        conn: Conexión a la base de datos
+        documento (dict): Detalles del documento obtenidos de la API
+    
+    Returns:
+        bool: True si la actualización fue exitosa, False en caso contrario
+    """
+    try:
+        # Extraer los datos necesarios del documento
+        document_id = documento.get('documentId', '')
+        cufe = documento.get('cufe', '')
+        estado_dian = documento.get('estadoDian', '')
+        fecha_recepcion = documento.get('fechaRecepcionDian', '')
+        
+        # Consulta SQL para actualizar el estado
+        update_query = """
+        UPDATE CtrlFacEleCol 
+        SET 
+            docStatus = ?, 
+            CUFE = ?, 
+            EstadoDian = ?, 
+            FechaRecepcionDian = ?,
+            FechaActualizacion = GETDATE()
+        WHERE ProveeTec = 'cenet' AND DocumentID = ?
+        """
+        
+        # Ejecutar la actualización
+        cursor.execute(update_query, (estado_dian, cufe, estado_dian, fecha_recepcion, document_id))
+        conn.commit()
+        
+        logging.info(f"Documento {document_id} actualizado exitosamente")
+        return True
+    
+    except Exception as e:
+        logging.error(f"Error al actualizar documento {document_id}: {e}")
+        conn.rollback()
+        return False
+
+# Resto del código anterior (enviar_correo, ESTADOS_DESCRIPCION, etc.) se mantiene igual
+
+def procesar_documentos_pendientes():
+    """
+    Procesa los documentos pendientes de actualización
+    """
+    # Obtener token
+    token = obtener_token()
+    
+    if not token:
+        logging.error("No se pudo obtener el token. Terminando.")
+        return
+    
+    # Conexión a la segunda base de datos
+    try:
+        conn2 = pyodbc.connect(
+            'DRIVER={ODBC Driver 17 for SQL Server};'
+            f'SERVER={os.getenv("SQL_SERVER_2")};'
+            f'DATABASE={os.getenv("SQL_DATABASE_2")};'
+            f'UID={os.getenv("SQL_USER_2")};'
+            f'PWD={os.getenv("SQL_PASSWORD_2")};'
+            'Timeout=10;'
+        )
+        cursor2 = conn2.cursor()
+        logging.info("Conexión exitosa a la segunda base de datos.")
+    except Exception as e:
+        logging.error(f"Error en la conexión a la segunda base de datos: {e}")
+        return
+    
+    try:
+        # Consultar documentos pendientes usando el query proporcionado
+        query_pendientes = """
+        SELECT documentId, docStatus, Cufe
+        FROM CtrlFacEleCol
+        WHERE docStatus NOT IN ('72','73','74')
+        """
+        
+        cursor2.execute(query_pendientes)
+        documentos_pendientes = cursor2.fetchall()
+        
+        logging.info(f"Se encontraron {len(documentos_pendientes)} documentos pendientes")
+        
+        # Procesar cada documento pendiente
+        for documento in documentos_pendientes:
+            document_id = documento[0]
+            estado_actual = documento[1]
+            cufe_actual = documento[2]
+            
+            try:
+                # Consultar detalles del documento
+                detalles_documento = obtener_documento(token, document_id)
+                
+                if detalles_documento:
+                    # Verificar si hay cambios relevantes
+                    nuevo_estado = detalles_documento.get('estadoDian', '')
+                    nuevo_cufe = detalles_documento.get('cufe', '')
+                    
+                    # Solo actualizar si hay cambios significativos
+                    if nuevo_estado != estado_actual or nuevo_cufe != cufe_actual:
+                        # Actualizar estado en la base de datos
+                        resultado = actualizar_estado_documento(cursor2, conn2, detalles_documento)
+                        
+                        if resultado:
+                            logging.info(f"Documento {document_id} actualizado. Estado anterior: {estado_actual}, Nuevo estado: {nuevo_estado}")
+                        else:
+                            logging.warning(f"No se pudo actualizar el documento {document_id}")
+                    else:
+                        logging.info(f"Documento {document_id} no requiere actualización")
+                
+            except Exception as e:
+                logging.error(f"Error procesando documento {document_id}: {e}")
+        
+        logging.info("Procesamiento de documentos pendientes completado")
+    
+    except Exception as e:
+        logging.error(f"Error general al procesar documentos pendientes: {e}")
+    
+    finally:
+        cursor2.close()
+        conn2.close()
+
+def actualizar_estado_documento(cursor, conn, documento):
+    """
+    Actualiza el estado del documento en la tabla de control
+    
+    Args:
+        cursor: Cursor de la base de datos
+        conn: Conexión a la base de datos
+        documento (dict): Detalles del documento obtenidos de la API
+    
+    Returns:
+        bool: True si la actualización fue exitosa, False en caso contrario
+    """
+    try:
+        # Extraer los datos necesarios del documento
+        document_id = documento.get('documentId', '')
+        cufe = documento.get('cufe', '')
+        estado_dian = documento.get('estadoDian', '')
+        fecha_recepcion = documento.get('fechaRecepcionDian', '')
+        
+        # Consulta SQL para actualizar el estado
+        update_query = """
+        UPDATE CtrlFacEleCol 
+        SET 
+            docStatus = ?, 
+            CUFE = ?, 
+            EstadoDian = ?, 
+            FechaRecepcionDian = ?,
+            FechaActualizacion = GETDATE()
+        WHERE DocumentID = ?
+        """
+        
+        # Ejecutar la actualización
+        cursor.execute(update_query, (estado_dian, cufe, estado_dian, fecha_recepcion, document_id))
+        conn.commit()
+        
+        logging.info(f"Documento {document_id} actualizado exitosamente")
+        return True
+    
+    except Exception as e:
+        logging.error(f"Error al actualizar documento {document_id}: {e}")
+        conn.rollback()
+        return False
+
+def main():
+    # Procesar documentos pendientes antes de las validaciones
+    procesar_documentos_pendientes()
+    
+    # Obtener token
+    token = obtener_token()
+    
+    if not token:
+        logging.error("No se pudo obtener el token. Terminando.")
+        return
+    
+    # Ejemplo de consulta de documento
+    document_id = "ddab75e4-9763-46b6-814b-77e5bbae2893"
+    resultado = consultar_estado_documento(token, document_id)
+    
+    if resultado:
+        # Puedes procesar aquí la respuesta como necesites
+        print("Respuesta completa:")
+        print(resultado)
+    else:
+        logging.error("No se pudo consultar el estado del documento")
 
 load_dotenv()  # Carga variables de entorno para credenciales
 
@@ -38,6 +363,7 @@ ESTADOS_DESCRIPCION = {
     "98": "Pendiente por validación DIAN"
 }
 
+# Cargar credenciales de correo electrónico
 def enviar_correo(errores, asunto):
     if errores:
         mensaje = "<html><body>"
@@ -63,7 +389,7 @@ def enviar_correo(errores, asunto):
 
         email = EmailMessage()
         email['From'] = os.getenv("EMAIL_USER")
-        email['To'] = os.getenv("EMAIL_USER"),"mdiaz@nikkenlatam.com","aporras@nikkenlatam.com"
+        email['To'] = os.getenv("EMAIL_USER")#,"navila@nikkenlatam.com","mdiaz@nikkenlatam.com","aporras@nikkenlatam.com"
         email['Subject'] = asunto
         email.set_content(mensaje, subtype='html')
 
@@ -277,7 +603,7 @@ SELECT TipDoc, Series, DocNum, CardCode, CardName, FecEnvio, ProveeTec, docStatu
 FROM CtrlFacEleCol 
 WHERE ProveeTec = 'cenet' 
 AND FecEnvio BETWEEN '20250326' AND '20250326' 
-AND docStatus NOT IN ('73', '74')
+AND docStatus NOT IN ('72', '73', '74')
 """
 cursor2.execute(query2)
 
