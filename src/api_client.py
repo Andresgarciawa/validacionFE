@@ -58,7 +58,7 @@ class APIClient:
             "SchemaID": Settings.API_SCHEMAID,
             "DocumentType": document_type,
             "IDNumber": Settings.API_IDNUMBER,
-            "DocumentID": document_id
+            "DocumentID": 1
         }
 
         headers = {

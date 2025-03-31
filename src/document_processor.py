@@ -26,13 +26,17 @@ class DocumentProcessor:
     @staticmethod
     def procesar_base_datos_1():
         try:
+            # Obtener la fecha actual en formato YYYYMMDD para las consultas SQL
+            from datetime import datetime
+            fecha_actual = datetime.now().strftime('%Y%m%d')
+            
             conn = DatabaseConnection.conectar_base_datos_1()
             cursor = conn.cursor()
             
             # SQL query para obtener los documentos de la base de datos SAP
-            # Esta consulta obtiene información de varias tablas y filtra por fechas específicas
+            # Esta consulta obtiene información de varias tablas y filtra por fechas dinámicas
             # Se utiliza UNION ALL para combinar resultados de diferentes tipos de documentos
-            query1 = """
+            query1 = f"""
             SELECT DISTINCT 
                 T0.[DocDate], 
                 'Factura FV' AS tipo_documentoFE, 
@@ -57,10 +61,8 @@ class DocumentProcessor:
             FROM OINV T0  
             INNER JOIN INV1 T1 ON T0.[DocEntry] = T1.[DocEntry] 
             INNER JOIN OCRD T2 ON T0.[CardCode] = T2.[CardCode] 
-            WHERE T0.[DocDate] BETWEEN '20250328' AND '20250328'
-
+            WHERE T0.[DocDate] BETWEEN '{fecha_actual}' AND '{fecha_actual}'
             UNION ALL
-
             SELECT DISTINCT 
                 T0.[DocDate], 
                 'Factura NC' AS tipo_documentoFE, 
@@ -85,10 +87,8 @@ class DocumentProcessor:
             FROM ORIN T0  
             INNER JOIN RIN1 T1 ON T0.[DocEntry] = T1.[DocEntry] 
             INNER JOIN OCRD T2 ON T0.[CardCode] = T2.[CardCode] 
-            WHERE T0.[DocDate] BETWEEN '20250328' AND '20250328'
-
+            WHERE T0.[DocDate] BETWEEN '{fecha_actual}' AND '{fecha_actual}'
             UNION ALL
-
             SELECT DISTINCT 
                 T0.[DocDate], 
                 'Factura BOMC' AS tipo_documentoFE, 
@@ -115,11 +115,9 @@ class DocumentProcessor:
             INNER JOIN [dbo].[OCRD] T2 ON T0.[CardCode] = T2.[CardCode] 
             INNER JOIN RPC1 T3 ON T0.[DocEntry] = T3.[DocEntry] 
             INNER JOIN CRD1 T4 ON T2.[CardCode] = T4.[CardCode] 
-            WHERE T0.[DocDate] BETWEEN '20250328' AND '20250328'
+            WHERE T0.[DocDate] BETWEEN '{fecha_actual}' AND '{fecha_actual}'
             AND T1.[SeriesName] = 'Bonif_MC'
-
             UNION ALL
-
             SELECT DISTINCT 
                 T0.[DocDate], 
                 'Doc. Sopo' AS tipo_documentoFE, 
@@ -146,7 +144,7 @@ class DocumentProcessor:
             INNER JOIN OCRD T2 ON T0.[CardCode] = T2.[CardCode] 
             INNER JOIN PCH5 T3 ON T0.[DocEntry] = T3.[AbsEntry]
             INNER JOIN CRD1 T4 ON T2.[CardCode] = T4.[CardCode] 
-            WHERE T0.[DocDate] BETWEEN '20250328' AND '20250328'
+            WHERE T0.[DocDate] BETWEEN '{fecha_actual}' AND '{fecha_actual}'
             AND T1.[SeriesName] BETWEEN 'BRS' AND 'DE'
             """
             
@@ -164,9 +162,7 @@ class DocumentProcessor:
                 tipdocumento = row[9]
                 documento = row[7]
                 telefono = row[19] if len(row) > 19 else ''
-
                 error_msg = []
-
                 if direccion and "'" in direccion:
                     error_msg.append("Comillas en la dirección")
                 if not correo or not re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", correo):
@@ -181,10 +177,8 @@ class DocumentProcessor:
                 ('-' in telefono and len(telefono) != 8) or \
                 ('-' not in telefono and len(telefono) < 6):
                     error_msg.append("Teléfono no válido")
-
                 if error_msg:
                     errores_1.append(f"{tipo_documentoFE} {doc_num} - {nombre} - Código {cardcode} - {', '.join(error_msg)}")
-
             cursor.close()
             conn.close()
             
@@ -200,13 +194,16 @@ class DocumentProcessor:
             conn = DatabaseConnection.conectar_base_datos_2()
             cursor = conn.cursor()
             
-            # SQL query para obtener los documentos de la base de datos de control
-            # Esta consulta obtiene información de la tabla CtrlFacEleCol y filtra por fechas específicas
-            query2 = """
+            # Obtener la fecha actual en formato YYYYMMDD
+            from datetime import datetime
+            fecha_actual = datetime.now().strftime('%Y-%m-%d')
+            
+            # SQL query con fechas dinámicas
+            query2 = f"""
             SELECT TipDoc, Series, DocNum, CardCode, CardName, FecEnvio, ProveeTec, docStatus 
             FROM CtrlFacEleCol 
             WHERE ProveeTec = 'cenet' 
-            AND docStatus NOT IN ('72', '73', '74') AND FecEnvio BETWEEN '20250328' AND '20250328'
+            AND docStatus NOT IN ('72', '73', '74') AND FecEnvio BETWEEN '{fecha_actual}' AND '{fecha_actual}'
             """
             
             cursor.execute(query2)
@@ -242,15 +239,19 @@ class DocumentProcessor:
             return
 
         try:
+            # Obtener la fecha actual en formato YYYY-MM-DD
+            from datetime import datetime
+            fecha_actual = datetime.now().strftime('%Y-%m-%d')
+            
             conn = DatabaseConnection.conectar_base_datos_2()
             cursor = conn.cursor()
 
-            # SQL query para obtener documentos pendientes
-            query_pendientes = """
+            # SQL query para obtener documentos pendientes con fecha dinámica
+            query_pendientes = f"""
             SELECT documentId, docStatus, Cufe, tipDoc
             FROM CtrlFacEleCol
             WHERE docStatus NOT IN ('72', '73', '74')
-            AND TipDoc NOT IN ('BRS', 'DE') AND FecEnvio BETWEEN '2025-03-28' AND '2025-03-28'
+            AND TipDoc NOT IN ('BRS', 'DE') AND FecEnvio BETWEEN '{fecha_actual}' AND '{fecha_actual}'
             """
 
             cursor.execute(query_pendientes)
@@ -265,11 +266,11 @@ class DocumentProcessor:
                 tip_doc = documento[3]
 
                 if tip_doc in ['FV', 'NCP']:
-                    tipo_documento = 'FV'
+                    tipo_documento = '1'
                 elif tip_doc in ['NC', 'NDP']:
-                    tipo_documento = 'NC'
+                    tipo_documento = '2'
                 else:
-                    logging.warning(f"Tipo de documento desconocido: {tip_doc}. Se usará 'FV' por defecto.")
+                    logging.warning(f"Tipo de documento desconocido: {tip_doc}. Se usará {tipo_documento} por defecto.")
                     tipo_documento = 'FV'
 
                 detalles_documento = APIClient.obtener_documento(token, document_id, tipo_documento)
