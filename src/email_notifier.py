@@ -72,7 +72,7 @@ class EmailNotifier:
                 if "falta el documento" in error_lower or "correo inválido" in error_lower:
                     prioridad = 'baja'
                 elif "falta el régimen" in error_lower or "falta el tipo de documento" in error_lower:
-                    prioridad = 'alta'
+                    prioridad = 'media'
                 elif "Comillas en la dirección" in error_lower or "Teléfono no válido" in error_lower:
                     prioridad = 'alta'
                 elif "Error en la base de datos" in error_lower or "Error de conexión" in error_lower:
