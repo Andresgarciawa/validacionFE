@@ -7,23 +7,23 @@ import sys
 import os
 import time
 import logging
-import subprocess
 
 # Configuración de logging
-log_file = os.path.join(r'C:\Users\wgacol\Documents\Proyecto\COL\validacion FE\logs', 'servicio.log')
-os.makedirs(os.path.dirname(log_file), exist_ok=True)
+log_dir = r'C:\Users\wgacol\Documents\Proyecto\COL\validacion FE\logs'
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, 'servicio_validacion.log')
+
 logging.basicConfig(
     filename=log_file,
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# Ajusta esta ruta al directorio donde está tu script
+# Configuración del script a ejecutar
 SCRIPT_DIR = r'C:\Users\wgacol\Documents\Proyecto\COL\validacion FE\dist'
-# Ajusta esto al nombre de tu script
 SCRIPT_NAME = r'validacionFE.py'
 
-class AppService(win32serviceutil.ServiceFramework):
+class ValidacionService(win32serviceutil.ServiceFramework):
     _svc_name_ = "ValidacionFEService"
     _svc_display_name_ = "Validación de Documentos Electrónicos"
     _svc_description_ = "Servicio que ejecuta la verificación de documentos electrónicos"
@@ -58,42 +58,33 @@ class AppService(win32serviceutil.ServiceFramework):
                 # Cambiar al directorio de tu script
                 os.chdir(SCRIPT_DIR)
                 
-                # Ejecutar el script usando subprocess
-                process = subprocess.Popen(
-                    ['python', SCRIPT_NAME],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
-                stdout, stderr = process.communicate()
-
-                # Revisar si hubo algún error
-                if process.returncode != 0:
-                    logging.error(f"Error al ejecutar el script: {stderr.decode()}")
+                # Ejecutar tu script con la ruta completa al intérprete de Python
+                python_exe = sys.executable
+                exit_code = os.system(f'"{python_exe}" {SCRIPT_NAME}')
+                
+                if exit_code != 0:
+                    logging.error(f"El script terminó con código de error: {exit_code}")
                 else:
-                    logging.info(f"Salida del script:\n{stdout.decode()}")
+                    logging.info("Script ejecutado correctamente")
                 
                 # Comprobar si se ha solicitado detener el servicio
                 rc = win32event.WaitForSingleObject(self.hWaitStop, 0)
                 if rc == win32event.WAIT_OBJECT_0:
                     break
                 
-                # Esperar un tiempo determinado antes de volver a ejecutar
+                # Esperar antes de la siguiente ejecución
                 logging.info("Esperando para la próxima ejecución...")
                 
-                # Esperar en bloques de 10 segundos, comprobando si se solicita parar
-                remaining_time = 3600  # 1 hora (ajusta según sea necesario)
-                while remaining_time > 0 and self.is_running:
-                    wait_time = min(10, remaining_time)  # Esperar como máximo 10 segundos
-                    rc = win32event.WaitForSingleObject(self.hWaitStop, wait_time * 1000)
-                    if rc == win32event.WAIT_OBJECT_0:
-                        # Se ha solicitado detener el servicio
-                        logging.info("Interrupción recibida durante espera")
+                # Esperar en intervalos cortos para responder rápidamente a solicitudes de parada
+                for _ in range(360):  # 3600 segundos = 1 hora, en intervalos de 10 segundos
+                    if not self.is_running:
                         break
-                    remaining_time -= wait_time
-            
+                    rc = win32event.WaitForSingleObject(self.hWaitStop, 10000)  # 10 segundos
+                    if rc == win32event.WAIT_OBJECT_0:
+                        break
+                
             except Exception as e:
                 logging.error(f"Error en el servicio: {str(e)}")
-                # Esperar un poco antes de intentar de nuevo
                 time.sleep(60)  # Esperar 1 minuto en caso de error
 
         logging.info("Bucle principal del servicio finalizado")
@@ -101,7 +92,7 @@ class AppService(win32serviceutil.ServiceFramework):
 if __name__ == '__main__':
     if len(sys.argv) == 1:
         servicemanager.Initialize()
-        servicemanager.PrepareToHostSingle(AppService)
+        servicemanager.PrepareToHostSingle(ValidacionService)
         servicemanager.StartServiceCtrlDispatcher()
     else:
-        win32serviceutil.HandleCommandLine(AppService)
+        win32serviceutil.HandleCommandLine(ValidacionService)

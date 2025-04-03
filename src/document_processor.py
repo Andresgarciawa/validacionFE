@@ -27,7 +27,6 @@ class DocumentProcessor:
     def procesar_base_datos_1():
         try:
             # Obtener la fecha actual en formato YYYYMMDD para las consultas SQL
-            from datetime import datetime
             fecha_actual = datetime.now().strftime('%Y%m%d')
             
             conn = DatabaseConnection.conectar_base_datos_1()
@@ -161,24 +160,45 @@ class DocumentProcessor:
                 regimen = row[8]
                 tipdocumento = row[9]
                 documento = row[7]
-                telefono = row[19] if len(row) > 19 else ''
+                telefono = row[19].strip() if len(row) > 19 and row[19] else ''
+
                 error_msg = []
+
+                # 🔹 Validación de dirección (sin comillas simples)
                 if direccion and "'" in direccion:
                     error_msg.append("Comillas en la dirección")
+
+                # 🔹 Validación de correo
                 if not correo or not re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", correo):
                     error_msg.append("Correo inválido")
+
+                # 🔹 Validaciones de datos requeridos
                 if not regimen:
                     error_msg.append("Falta el régimen")
+                # Validacion tipo de documento 
                 if not tipdocumento:
                     error_msg.append("Falta el tipo de documento")
+                # Validación de documento (sin tamaño valido para NIT)
                 if not documento:
                     error_msg.append("Falta el documento")
-                if not telefono or not any(char.isdigit() for char in telefono) or \
-                ('-' in telefono and len(telefono) != 8) or \
-                ('-' not in telefono and len(telefono) < 6):
-                    error_msg.append("Teléfono no válido")
+                else:
+                    # 🔹 Validación de documento con "-"
+                    if "-" in documento:
+                        partes = documento.split("-")
+                        if len(partes) != 2 or len(partes[0]) != 9 or not partes[0].isdigit() or not partes[1].isdigit():
+                            error_msg.append("Documento inválido (debe ser en formato NNNNNNNNN-X)")
+
+                # 🔹 Validación de teléfono (Solo si no está vacío)
+                if telefono:  
+                    if '-' in telefono:
+                        error_msg.append("Teléfono inválido: contiene '-'")
+                    elif len(re.sub(r"\D", "", telefono)) < 6:  # Elimina no numéricos y verifica longitud
+                        error_msg.append("Teléfono debe tener al menos 6 números")
+
+                # 🔹 Si hay errores, los agregamos a la lista
                 if error_msg:
                     errores_1.append(f"{tipo_documentoFE} {doc_num} - {nombre} - Código {cardcode} - {', '.join(error_msg)}")
+
             cursor.close()
             conn.close()
             
@@ -230,94 +250,93 @@ class DocumentProcessor:
             logging.error(f"Error procesando base de datos 2: {e}")
             return []
 
+    # Método para procesar documentos pendientes
     @staticmethod
     def procesar_documentos_pendientes():
         token = APIClient.obtener_token()
-
         if not token:
             logging.error("No se pudo obtener el token. Terminando.")
             return
 
         try:
             # Obtener la fecha actual en formato YYYY-MM-DD
-            from datetime import datetime
             fecha_actual = datetime.now().strftime('%Y-%m-%d')
-            
+            # Conexión a la base de datos 2
             conn = DatabaseConnection.conectar_base_datos_2()
-            cursor = conn.cursor()
 
-            # SQL query para obtener documentos pendientes con fecha dinámica
-            query_pendientes = f"""
-            SELECT documentId, docStatus, Cufe, tipDoc
-            FROM CtrlFacEleCol
-            WHERE docStatus NOT IN ('72', '73', '74')
-            AND TipDoc NOT IN ('BRS', 'DE') AND FecEnvio BETWEEN '{fecha_actual}' AND '{fecha_actual}'
-            """
+            # SQL query para obtener documentos pendientes
+            with conn.cursor() as cursor:
+                query_pendientes = """
+                SELECT documentId, docStatus, Cufe, tipDoc
+                FROM CtrlFacEleCol
+                WHERE docStatus NOT IN ('72', '73', '74')
+                AND tipDoc IN ('FV', 'NCP', 'NC', 'NDP')
+                AND FecEnvio BETWEEN ? AND ?
+                """
+                # Ejecutar la consulta con fechas dinámicas
+                cursor.execute(query_pendientes, (fecha_actual, fecha_actual))
+                # Obtener los resultados
+                documentos_pendientes = cursor.fetchall()
+                # Verificar si hay documentos pendientes
+                logging.info(f"Se encontraron {len(documentos_pendientes)} documentos pendientes")
 
-            cursor.execute(query_pendientes)
-            documentos_pendientes = cursor.fetchall()
+            for document_id, estado_actual, cufe_actual, tip_doc in documentos_pendientes:
+                tipo_documento = DocumentProcessor.determinar_tipo_documento(tip_doc)
+                
+                if tipo_documento is None:
+                    continue  # Salta el documento si el tipo es inválido
 
-            logging.info(f"Se encontraron {len(documentos_pendientes)} documentos pendientes")
-
-            for documento in documentos_pendientes:
-                document_id = documento[0]
-                estado_actual = documento[1]
-                cufe_actual = documento[2]
-                tip_doc = documento[3]
-
-                if tip_doc in ['FV', 'NCP']:
-                    tipo_documento = '1'
-                elif tip_doc in ['NC', 'NDP']:
-                    tipo_documento = '2'
-                else:
-                    logging.warning(f"Tipo de documento desconocido: {tip_doc}. Se usará {tipo_documento} por defecto.")
-                    tipo_documento = 'FV'
+                logging.info(f"Enviando DocumentID {document_id} con DocumentType {tipo_documento}")
 
                 detalles_documento = APIClient.obtener_documento(token, document_id, tipo_documento)
-
+                
                 if detalles_documento:
-                    nuevo_estado = detalles_documento.get('estadoDian', '')
-                    nuevo_cufe = detalles_documento.get('cufe', '')
-                    dian_errors = detalles_documento.get('DIANErrors', '')
-                    docnum = detalles_documento.get('DocumentNumber', '').strip().replace(" ", "").translate(str.maketrans('', '', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'))
+                    DocumentProcessor.actualizar_estado_documento(cursor, conn, detalles_documento)
 
-                    if nuevo_estado != estado_actual or nuevo_cufe != cufe_actual:
-                        DocumentProcessor.actualizar_estado_documento(cursor, conn, detalles_documento)
-
-                    if dian_errors and docnum:
-                        update_query = "UPDATE CtrlFacEleCol SET RespDian = ? WHERE docnum = ?"
-                        cursor.execute(update_query, (dian_errors, docnum))
-
-            cursor.close()
             conn.close()
-
             logging.info("Procesamiento de documentos pendientes completado")
 
         except Exception as e:
-            logging.error(f"Error general al procesar documentos pendientes: {e}")
+            logging.error(f"Error al procesar documentos pendientes: {e}")
 
+    @staticmethod
+    def determinar_tipo_documento(tip_doc):
+        mapping = {
+            'FV': 1,
+            'NCP': 1,
+            'NC': 2,
+            'NDP': 2
+        }
+
+        tip_doc = tip_doc.strip()  # Eliminamos espacios en blanco
+        tipo_documento = mapping.get(tip_doc)
+
+        if tipo_documento is None:
+            logging.warning(f"Tipo de documento inválido: '{tip_doc}'. No se enviará la solicitud.")
+
+        return tipo_documento
 
     @staticmethod
     def actualizar_estado_documento(cursor, conn, documento):
         try:
-            document_id = documento.get('documentId', '')
-            cufe = documento.get('cufe', '')
-            doc_num = documento.get('DocumentNumber', '')
+            document_id = documento.get('DocumentID', '').strip()
+            cufe = documento.get('CUFE', '').strip()
+            doc_num = documento.get('DocumentNumber', '').strip()
 
-            # Actualizar el estado y CUFE en la base de datos
+            # Eliminamos las letras del número de documento
+            doc_num = ''.join(filter(str.isdigit, doc_num))
+
             update_query = """
             UPDATE CtrlFacEleCol
-            SET Cufe = %s,
-                docStatus = '74'
-            WHERE DocNum = %s
+            SET Cufe = ?, docStatus = '74'
+            WHERE DocNum = ?
             """
 
-            cursor.execute(update_query, (cufe, doc_num))
-            conn.commit()
+            cursor.execute(update_query, (cufe, doc_num))  # Pasa solo dos parámetros
 
+            conn.commit()
             logging.info(f"Documento {document_id} actualizado exitosamente con CUFE: {cufe}")
             return True
-
         except Exception as e:
             logging.error(f"Error al actualizar documento {document_id}: {e}")
             conn.rollback()

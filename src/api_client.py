@@ -2,8 +2,12 @@ import logging
 import time
 import threading
 import requests
+import json
 from config.settings import Settings
 
+
+# ------------------------ CLIENTE API ------------------------
+# Esta clase se encarga de interactuar con la API para obtener el token y consultar documentos.
 class APIClient:
     @staticmethod
     def obtener_token():
@@ -52,14 +56,11 @@ class APIClient:
 
     @staticmethod
     def obtener_documento(token, document_id, document_type):
-        url_base = Settings.API_STATUS_URL
+        if document_type is None:
+            logging.warning(f"Tipo de documento inválido para DocumentID {document_id}. No se enviará la solicitud.")
+            return None
 
-        params = {
-            "SchemaID": Settings.API_SCHEMAID,
-            "DocumentType": document_type,
-            "IDNumber": Settings.API_IDNUMBER,
-            "DocumentID": 1
-        }
+        url_base = f"{Settings.API_STATUS_URL}?SchemaID={Settings.API_SCHEMAID}&DocumentType={document_type}&IDNumber={Settings.API_IDNUMBER}&DocumentID={document_id.strip()}"
 
         headers = {
             "Authorization": f"Bearer {token}",
@@ -68,20 +69,24 @@ class APIClient:
 
         try:
             logging.info(f"Consultando detalles para DocumentID: {document_id} con DocumentType: {document_type}")
-
-            response = requests.post(url_base, json=params, headers=headers)  # Cambio a POST y uso de json=params
-            response.raise_for_status()
+            
+            response = requests.post(url_base, headers=headers)  # Sin JSON en el cuerpo, porque los parámetros van en la URL
+            response.raise_for_status()  # Lanza excepción si hay error HTTP
 
             data = response.json()
+
+            if not data:
+                logging.warning(f"La respuesta de la API está vacía para DocumentID {document_id}")
+                return None
 
             logging.info(f"Consulta de documento exitosa para DocumentID: {document_id}")
             return data
 
         except requests.RequestException as e:
-            logging.error(f"Error al consultar DocumentID {document_id}: {e}")
+            logging.error(f"Error en la solicitud API para DocumentID {document_id}: {e}")
             return None
         except ValueError as e:
-            logging.error(f"Error al procesar respuesta JSON para DocumentID {document_id}: {e}")
+            logging.error(f"Error al procesar la respuesta JSON para DocumentID {document_id}: {e}")
             return None
 
 # ------------------------ PROGRAMAR TAREAS CON INTERVALOS ------------------------

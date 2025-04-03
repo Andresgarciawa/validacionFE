@@ -41,7 +41,7 @@ class EmailNotifier:
         colores_prioridad = {
             'alta': '#ff3333',     # Rojo para errores críticos
             'media': '#fff301',    # Amarillo para errores importantes
-            'baja': '#01ffd5'      # Verde claro para errores menores
+            'baja': '#77fbe7'      # Verde claro para errores menores
         }
         
         mensaje = "<html><body>"
@@ -51,6 +51,7 @@ class EmailNotifier:
         mensaje += f"<div style='margin-bottom: 10px;'>"
         mensaje += f"<span style='background-color: {colores_prioridad['alta']}; padding: 3px 10px; margin-right: 10px;'>Alta prioridad</span>"
         mensaje += f"<span style='background-color: {colores_prioridad['media']}; padding: 3px 10px; margin-right: 10px;'>Media prioridad</span>"
+        mensaje += f"<span style='background-color: {colores_prioridad['baja']}; padding: 3px 10px;'>Baja prioridad</span>"
         mensaje += "</div>"
         mensaje += "<table border='1' cellpadding='8' cellspacing='0' style='border-collapse: collapse; width: 100%; table-layout: fixed;'>"
         mensaje += "<tr style='background-color: #5eff33; color: white;'><th>Documento</th><th>Nombre</th><th>Código</th><th>Error</th></tr>"
@@ -64,7 +65,7 @@ class EmailNotifier:
                 error_desc = partes[3].strip() if len(partes) > 3 else ""
                 
                 # Determinar la prioridad basada en el tipo de error
-                prioridad = 'media'  # Por defecto
+                prioridad = 'baja'  # Por defecto
                 
                 # Determinar prioridad basada en palabras clave o condiciones
                 # Aquí puedes personalizar la lógica según tus necesidades
