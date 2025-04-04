@@ -1,1 +1,12 @@
-
+2025-04-04 13:05:39,421 - INFO - [main.py:26] - Iniciando proceso de validación de documentos...
+2025-04-04 13:05:39,810 - INFO - [api_client.py:35] - ✅ Token obtenido correctamente: eyJhb...5vSP4
+2025-04-04 13:05:39,811 - INFO - [api_client.py:36] - ⏱ Tiempo de obtención del token: 0m 0s
+2025-04-04 13:05:40,899 - INFO - [database.py:88] - Conexión exitosa a la segunda base de datos.
+2025-04-04 13:05:41,826 - INFO - [document_processor.py:286] - Se encontraron 0 documentos pendientes de FE, NCP, NC y NDP
+2025-04-04 13:05:42,129 - INFO - [document_processor.py:302] - Procesamiento de documentos pendientes completado
+2025-04-04 13:05:42,771 - INFO - [api_client.py:35] - ✅ Token obtenido correctamente: eyJhb...PmqY4
+2025-04-04 13:05:42,771 - INFO - [api_client.py:36] - ⏱ Tiempo de obtención del token: 0m 0s
+2025-04-04 13:05:42,872 - INFO - [database.py:88] - Conexión exitosa a la segunda base de datos.
+2025-04-04 13:05:43,005 - INFO - [document_processor.py:377] - Se encontraron 0 documentos pendientes de BRS, DE y NCDS
+2025-04-04 13:05:43,622 - INFO - [document_processor.py:393] - Procesamiento de documentos pendientes completado
+2025-04-04 13:05:44,692 - INFO - [database.py:62] - Conexión exitosa a la primera base de datos.

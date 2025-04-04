@@ -5,6 +5,10 @@ from dotenv import load_dotenv
 # Cargar variables de entorno
 load_dotenv()
 
+# Imprimir variables para verificar si están cargadas
+print("API_LOGIN_URL:", os.getenv("API_LOGIN_URL"))
+print("SQL_SERVER:", os.getenv("SQL_SERVER"))
+
 class ConfigurationError(Exception):
     """Excepción personalizada para errores de configuración."""
     pass
@@ -40,7 +44,9 @@ class Settings:
     # Configuración de API
     API_LOGIN_URL = os.getenv('API_LOGIN_URL')
     API_STATUS_URL = os.getenv('API_STATUS_URL')
+    API_STATUS_URL_2 = os.getenv('API_STATUS_URL_2')
     API_DOCUMENT_URL = os.getenv('API_DOCUMENT_URL')
+    API_DOCUMENT_URL_2 = os.getenv('API_DOCUMENT_URL_2')
     API_USERNAME = os.getenv('API_USERNAME')
     API_PASSWORD = os.getenv('API_PASSWORD')
     API_SCHEMAID = os.getenv('API_SCHEMAID')

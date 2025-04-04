@@ -25,8 +25,11 @@ def ejecutar_proceso():
     try:
         logging.info("Iniciando proceso de validación de documentos...")
 
-        # Procesar documentos pendientes
+        # Procesar documentos pendientes FE, NCP, NC y NDP
         DocumentProcessor.procesar_documentos_pendientes()
+
+        # Procesar documentos pendientes BRS, DE y NCDS
+        DocumentProcessor.procesar_documentos_pendientes_2()
 
         # Validar y enviar errores de base de datos
         errores_1 = DocumentProcessor.procesar_base_datos_1()
@@ -45,8 +48,8 @@ def main():
     
     while True:
         ejecutar_proceso()
-        logging.info("Esperando 30 minutos para la siguiente ejecución...")
-        time.sleep(1800)  # 1800 segundos = 30 minutos
+        logging.info("Esperando 60 minutos para la siguiente ejecución...")
+        time.sleep(3600)  # 1800 segundos = 30 minutos
 
 if __name__ == "__main__":
     main()
