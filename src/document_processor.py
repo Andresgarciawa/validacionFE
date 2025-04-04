@@ -254,6 +254,68 @@ class DocumentProcessor:
         except Exception as e:
             logging.error(f"Error procesando base de datos 2: {e}")
             return []
+        
+    # Método para comparar los documentos de SAP con CtrlFacEleCol
+    # Este método compara los documentos obtenidos de SAP con los de CtrlFacEleCol
+    @staticmethod
+    def comparar_sap_ctl():
+        try:
+            logging.info("Iniciando comparación entre SAP y CtrlFacEleCol...")
+            
+            errores_sin_envio = []
+            documentos_enviados = []
+
+            # 1. Obtener documentos desde SAP
+            sap_docs = DocumentProcessor.procesar_base_datos_1()
+
+            # 2. Obtener documentos desde CtrlFacEleCol que están ENVIADOS
+            conn = DatabaseConnection.conectar_base_datos_2()
+            cursor = conn.cursor()
+            fecha_actual = datetime.now().strftime('%Y-%m-%d')
+
+            query_ctrl = f"""
+            SELECT TipDoc, DocNum, CardCode, CardName, docStatus
+            FROM CtrlFacEleCol
+            WHERE docStatus IN ('72', '73', '74')
+            AND FecEnvio BETWEEN '{fecha_actual}' AND '{fecha_actual}'
+            """
+
+            cursor.execute(query_ctrl)
+            ctrl_docs = cursor.fetchall()
+            enviados_set = set((str(row[1]).strip(), str(row[2]).strip()) for row in ctrl_docs)
+
+            for row in ctrl_docs:
+                documentos_enviados.append({
+                    "TipDoc": str(row[0]).strip(),
+                    "DocNum": str(row[1]).strip(),
+                    "CardCode": str(row[2]).strip(),
+                    "CardName": row[3].strip() if row[3] else "",
+                })
+
+            for doc in sap_docs:
+                match = re.match(r"^(.*?) (\d+)", doc)
+                if match:
+                    doc_num = match.group(2).strip()
+                    match_cardcode = re.search(r"Código (\w+)", doc)
+                    cardcode = match_cardcode.group(1).strip() if match_cardcode else None
+
+                    if (doc_num, cardcode) not in enviados_set:
+                        errores_sin_envio.append({
+                            "DocNum": doc_num,
+                            "CardCode": cardcode,
+                            "CardName": "",
+                            "Error": "No enviado a DIAN"
+                        })
+
+            cursor.close()
+            conn.close()
+
+            return errores_sin_envio, documentos_enviados
+
+        except Exception as e:
+            logging.error(f"Error al comparar SAP con CtrlFacEleCol: {e}")
+            return [], []
+
 
     # Método para procesar documentos pendientes
     @staticmethod

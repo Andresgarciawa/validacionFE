@@ -1,9 +1,11 @@
 import logging
 import os
 import time
+import threading
 from config.settings import *
 from src.document_processor import DocumentProcessor
 from src.email_notifier import EmailNotifier
+from datetime import datetime, timedelta
 
 def configurar_logging():
     log_dir = 'logs'
@@ -21,35 +23,72 @@ def configurar_logging():
         ]
     )
 
-def ejecutar_proceso():
-    try:
-        logging.info("Iniciando proceso de validación de documentos...")
+# Proceso regular cada 60 minutos
+def ejecutar_proceso_regular():
+    while True:
+        try:
+            logging.info("⏱️ Iniciando proceso regular de validación...")
 
-        # Procesar documentos pendientes FE, NCP, NC y NDP
-        DocumentProcessor.procesar_documentos_pendientes()
+            DocumentProcessor.procesar_documentos_pendientes()
+            DocumentProcessor.procesar_documentos_pendientes_2()
 
-        # Procesar documentos pendientes BRS, DE y NCDS
-        DocumentProcessor.procesar_documentos_pendientes_2()
+            errores_1 = DocumentProcessor.procesar_base_datos_1()
+            EmailNotifier.enviar_correo(errores_1, "Errores en la base de datos SAP")
 
-        # Validar y enviar errores de base de datos
-        errores_1 = DocumentProcessor.procesar_base_datos_1()
-        EmailNotifier.enviar_correo(errores_1, "Errores en la base de datos SAP")
+            errores_2 = DocumentProcessor.procesar_base_datos_2()
+            EmailNotifier.enviar_correo(errores_2, "Errores en la base de datos Tabla de Control")
 
-        errores_2 = DocumentProcessor.procesar_base_datos_2()
-        EmailNotifier.enviar_correo(errores_2, "Errores en la base de datos Tabla de Control")
+            logging.info("✅ Proceso regular finalizado correctamente.")
 
-        logging.info("Proceso finalizado exitosamente.")
+        except Exception as e:
+            logging.error(f"❌ Error en el proceso regular: {e}")
 
-    except Exception as e:
-        logging.error(f"Error fatal en el proceso: {e}")
+        logging.info("🕒 Esperando 60 minutos para la siguiente ejecución del proceso regular...")
+        time.sleep(3600)  # 60 minutos
+
+# Comparación separada cada 24 horas
+def ejecutar_comparacion_diaria():
+    while True:
+        ahora = datetime.now()
+        hora_objetivo = ahora.replace(hour=9, minute=0, second=0, microsecond=0)
+
+        if ahora >= hora_objetivo:
+            # Si ya pasaron las 9:00 AM de hoy, se programa para mañana a las 9:00 AM
+            hora_objetivo += timedelta(days=1)
+
+        tiempo_espera = (hora_objetivo - ahora).total_seconds()
+        logging.info(f"🕒 Esperando hasta las 9:00 AM para iniciar comparación diaria (esperando {tiempo_espera/60:.1f} minutos)...")
+        time.sleep(tiempo_espera)
+
+        try:
+            logging.info("📊 Iniciando proceso de comparación diaria...")
+
+            registros_con_errores, registros_enviados = DocumentProcessor.comparar_sap_ctl()
+            if registros_con_errores or registros_enviados:
+                fecha_actual = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+                EmailNotifier.enviar_comparacion(fecha_actual, registros_con_errores, registros_enviados)
+
+            logging.info("✅ Comparación diaria finalizada.")
+
+        except Exception as e:
+            logging.error(f"❌ Error en el proceso de comparación diaria: {e}")
+
+        # Espera un minuto antes de calcular la siguiente espera (para evitar ejecuciones múltiples si toma muy poco tiempo)
+        time.sleep(60)
 
 def main():
     configurar_logging()
-    
-    while True:
-        ejecutar_proceso()
-        logging.info("Esperando 60 minutos para la siguiente ejecución...")
-        time.sleep(3600)  # 1800 segundos = 30 minutos
+
+    # Crear y arrancar los dos hilos
+    hilo_regular = threading.Thread(target=ejecutar_proceso_regular, daemon=True)
+    hilo_comparacion = threading.Thread(target=ejecutar_comparacion_diaria, daemon=True)
+
+    hilo_regular.start()
+    hilo_comparacion.start()
+
+    # Mantener vivo el hilo principal
+    hilo_regular.join()
+    hilo_comparacion.join()
 
 if __name__ == "__main__":
     main()

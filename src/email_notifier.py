@@ -11,7 +11,7 @@ class EmailNotifier:
     def enviar_correo(errores, asunto):
         # Añadir fecha al asunto
         from datetime import datetime
-        fecha_actual = datetime.now().strftime('%d/%m/%Y')
+        fecha_actual = datetime.now().strftime('%d/%m/%Y' + ' ' + '%H:%M:%S')
         asunto_con_fecha = f"{asunto} - {fecha_actual}"
         
         if errores:
@@ -100,6 +100,57 @@ class EmailNotifier:
         mensaje += "</body></html>"
         
         return mensaje
+
+
+# ------------------------ CORREO DE COMPARACION ------------------------
+    @staticmethod
+    def enviar_comparacion(fecha_actual, registros_con_errores, registros_enviados):
+        from datetime import datetime
+        fecha_envio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+        asunto = f"Comparación de documentos SAP y CTL - {fecha_envio}"
+
+        mensaje = "<html><body>"
+        mensaje += "<h2 style='color: #003366;'>📊 Resultado de la comparación de documentos</h2>"
+        mensaje += f"<p>Fecha del proceso: <strong>{fecha_envio}</strong></p>"
+
+        if registros_enviados:
+            mensaje += "<h3 style='color: green;'>✅ Documentos correctamente enviados</h3>"
+            mensaje += "<table border='1' cellpadding='6' cellspacing='0' style='border-collapse: collapse; width: 100%;'>"
+            mensaje += "<tr style='background-color: #c3f7c7;'><th>DocNum</th><th>CardName</th><th>CardCode</th><th>Estado</th></tr>"
+            for row in registros_enviados:
+                mensaje += f"<tr><td>{row['DocNum']}</td><td>{row['CardName']}</td><td>{row['CardCode']}</td><td style='color: green;'>Enviado</td></tr>"
+            mensaje += "</table><br>"
+
+        if registros_con_errores:
+            mensaje += "<h3 style='color: red;'>❌ Documentos con errores o no enviados</h3>"
+            mensaje += "<table border='1' cellpadding='6' cellspacing='0' style='border-collapse: collapse; width: 100%;'>"
+            mensaje += "<tr style='background-color: #f9caca;'><th>DocNum</th><th>CardName</th><th>CardCode</th><th>Error</th></tr>"
+            for row in registros_con_errores:
+                mensaje += f"<tr><td>{row['DocNum']}</td><td>{row['CardName']}</td><td>{row['CardCode']}</td><td style='color: red;'>{row['Error']}</td></tr>"
+            mensaje += "</table>"
+
+        if not registros_enviados and not registros_con_errores:
+            mensaje += "<p>No se encontraron registros para el día de hoy.</p>"
+
+        mensaje += "<p><i>Este correo fue generado automáticamente.</i></p>"
+        mensaje += "</body></html>"
+
+        # Preparar y enviar correo
+        email = EmailMessage()
+        email['From'] = Settings.EMAIL_USER
+        email['To'] = Settings.EMAIL_RECIPIENTS
+        email['Subject'] = asunto
+        email.set_content(mensaje, subtype='html')
+
+        try:
+            with smtplib.SMTP('smtp.gmail.com', 587) as smtp:
+                smtp.starttls()
+                smtp.login(Settings.EMAIL_USER, Settings.EMAIL_PASSWORD)
+                smtp.send_message(email)
+            logging.info("Correo de comparación enviado correctamente.")
+        except Exception as e:
+            logging.error(f"Error enviando correo de comparación: {e}")
+
 
 # ------------------------ PROGRAMAR TAREAS CON INTERVALOS ------------------------
 
