@@ -2,7 +2,7 @@ import logging
 import os
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from src.database import DatabaseConnection
 from src.api_client import APIClient
 from src.email_notifier import EmailNotifier
@@ -64,7 +64,7 @@ class DocumentProcessor:
             UNION ALL
             SELECT DISTINCT 
                 T0.[DocDate], 
-                'Factura NC' AS tipo_documentoFE, 
+                'Nota Credito' AS tipo_documentoFE, 
                 T0.[DocNum], 
                 T0.[NumAtCard], 
                 T0.[CardCode], 
@@ -261,50 +261,119 @@ class DocumentProcessor:
     def comparar_sap_ctl():
         try:
             logging.info("Iniciando comparación entre SAP y CtrlFacEleCol...")
-            
+
             errores_sin_envio = []
             documentos_enviados = []
 
-            # 1. Obtener documentos desde SAP
-            sap_docs = DocumentProcessor.procesar_base_datos_1()
+            # 1. Obtener documentos desde SAP con el query unificado
+            conn_sap = DatabaseConnection.conectar_base_datos_1()
+            cursor_sap = conn_sap.cursor()
 
-            # 2. Obtener documentos desde CtrlFacEleCol que están ENVIADOS
-            conn = DatabaseConnection.conectar_base_datos_2()
-            cursor = conn.cursor()
-            fecha_actual = datetime.now().strftime('%Y-%m-%d')
+            fecha_ayer = (datetime.now() - timedelta(days=1)).strftime('%Y%m%d')
 
-            query_ctrl = f"""
-            SELECT TipDoc, DocNum, CardCode, CardName, docStatus
-            FROM CtrlFacEleCol
-            WHERE docStatus IN ('72', '73', '74')
-            AND FecEnvio BETWEEN '{fecha_actual}' AND '{fecha_actual}'
+            query_sap = """
+            SELECT 'FV' AS tipo_FE, DocNum, CardCode, CardName, VatSum, Doctotal 
+            FROM OINV
+            WHERE CAST(DocDate AS DATE) = ?
+            UNION ALL
+            SELECT 'NC' AS tipo_FE, DocNum, CardCode, CardName, VatSum, Doctotal 
+            FROM ORIN
+            WHERE CAST(DocDate AS DATE) = ?
+            UNION ALL
+            SELECT 'NCP' AS tipo_FE, DocNum, CardCode, CardName, VatSum, Doctotal 
+            FROM ORPC
+            WHERE CAST(DocDate AS DATE) = ?
+            UNION ALL
+            SELECT 'NDP' AS tipo_FE, DocNum, CardCode, CardName, VatSum, Doctotal 
+            FROM ORIN
+            WHERE CAST(DocDate AS DATE) = ?
+            UNION ALL
+            SELECT 'DS' AS tipo_FE, P.DocNum, P.CardCode, P.CardName, P.VatSum, P.Doctotal
+            FROM OPCH P
+            INNER JOIN NNM1 T1 ON P.Series = T1.Series
+            WHERE T1.SeriesName BETWEEN 'BRS' AND 'DE' AND CAST(P.DocDate AS DATE) = ?
             """
 
-            cursor.execute(query_ctrl)
+            cursor_sap.execute(query_sap, (fecha_ayer,) * 5)
+            sap_docs = cursor_sap.fetchall()
+            cursor_sap.close()
+            conn_sap.close()
+
+            # 2. Obtener documentos desde CtrlFacEleCol generados AYER
+            conn = DatabaseConnection.conectar_base_datos_2()
+            cursor = conn.cursor()
+
+            query_ctrl = """
+            SELECT TipDoc, DocNum, CardCode, CardName, VatSum, Doctotal, docStatus
+            FROM CtrlFacEleCol
+            WHERE CAST(FecEnvio AS DATE) = ?
+            """
+            cursor.execute(query_ctrl, (fecha_ayer,))
             ctrl_docs = cursor.fetchall()
-            enviados_set = set((str(row[1]).strip(), str(row[2]).strip()) for row in ctrl_docs)
 
+            ctrl_dict = {}
             for row in ctrl_docs:
-                documentos_enviados.append({
-                    "TipDoc": str(row[0]).strip(),
-                    "DocNum": str(row[1]).strip(),
-                    "CardCode": str(row[2]).strip(),
-                    "CardName": row[3].strip() if row[3] else "",
-                })
+                tip_doc = str(row[0]).strip()
+                doc_num = str(row[1]).strip()
+                card_code = str(row[2]).strip()
+                card_name = row[3].strip() if row[3] else ""
+                vat_sum = row[4]
+                doc_total = row[5]
+                try:
+                    doc_status = int(str(row[6]).strip())
+                except (ValueError, TypeError):
+                    doc_status = None
 
-            for doc in sap_docs:
-                match = re.match(r"^(.*?) (\d+)", doc)
-                if match:
-                    doc_num = match.group(2).strip()
-                    match_cardcode = re.search(r"Código (\w+)", doc)
-                    cardcode = match_cardcode.group(1).strip() if match_cardcode else None
+                ctrl_dict[(tip_doc, doc_num, card_code)] = {
+                    "CardName": card_name,
+                    "VatSum": vat_sum,
+                    "DocTotal": doc_total,
+                    "docStatus": doc_status
+                }
 
-                    if (doc_num, cardcode) not in enviados_set:
-                        errores_sin_envio.append({
+            # Comparar SAP vs CtrlFacEleCol
+            for row in sap_docs:
+                tip_doc = str(row[0]).strip()
+                doc_num = str(row[1]).strip()
+                card_code = str(row[2]).strip()
+                card_name = row[3].strip() if row[3] else ""
+                vat_sum = row[4]
+                doc_total = row[5]
+                clave = (tip_doc, doc_num, card_code)
+
+                if clave not in ctrl_dict:
+                    errores_sin_envio.append({
+                        "TipDoc": tip_doc,
+                        "DocNum": doc_num,
+                        "CardCode": card_code,
+                        "CardName": card_name,
+                        "VatSum": vat_sum,
+                        "DocTotal": doc_total,
+                        "Error": "No enviado a DIAN"
+                    })
+                else:
+                    info = ctrl_dict[clave]
+                    if info["docStatus"] in [72, 73, 74]:
+                        documentos_enviados.append({
+                            "TipDoc": tip_doc,
                             "DocNum": doc_num,
-                            "CardCode": cardcode,
-                            "CardName": "",
-                            "Error": "No enviado a DIAN"
+                            "CardCode": card_code,
+                            "CardName": info["CardName"],
+                            "VatSum": info["VatSum"],
+                            "DocTotal": info["DocTotal"],
+                            "docStatus": info["docStatus"]  # 👈 aquí está el campo adicional
+                        })
+
+                    else:
+                        errores_sin_envio.append({
+                            "TipDoc": tip_doc,
+                            "DocNum": doc_num,
+                            "CardCode": card_code,
+                            "CardName": info["CardName"],
+                            "VatSum": info["VatSum"],
+                            "DocTotal": info["DocTotal"],
+                            "docStatus": info["docStatus"],  # 👈 se agrega este
+                            "Error": f"Estado inválido: {info['docStatus']}"
                         })
 
             cursor.close()
@@ -315,7 +384,6 @@ class DocumentProcessor:
         except Exception as e:
             logging.error(f"Error al comparar SAP con CtrlFacEleCol: {e}")
             return [], []
-
 
     # Método para procesar documentos pendientes
     @staticmethod

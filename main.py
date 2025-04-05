@@ -47,6 +47,7 @@ def ejecutar_proceso_regular():
         time.sleep(3600)  # 60 minutos
 
 # Comparación separada cada 24 horas
+# Comparación separada cada 24 horas
 def ejecutar_comparacion_diaria():
     while True:
         ahora = datetime.now()
@@ -64,9 +65,7 @@ def ejecutar_comparacion_diaria():
             logging.info("📊 Iniciando proceso de comparación diaria...")
 
             registros_con_errores, registros_enviados = DocumentProcessor.comparar_sap_ctl()
-            if registros_con_errores or registros_enviados:
-                fecha_actual = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-                EmailNotifier.enviar_comparacion(fecha_actual, registros_con_errores, registros_enviados)
+            EmailNotifier.enviar_comparacion(registros_con_errores, registros_enviados)
 
             logging.info("✅ Comparación diaria finalizada.")
 

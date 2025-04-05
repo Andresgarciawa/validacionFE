@@ -5,12 +5,12 @@ import threading
 import time
 from email.message import EmailMessage
 from config.settings import Settings
+from datetime import datetime, timedelta
 
 class EmailNotifier:
     @staticmethod
     def enviar_correo(errores, asunto):
         # Añadir fecha al asunto
-        from datetime import datetime
         fecha_actual = datetime.now().strftime('%d/%m/%Y' + ' ' + '%H:%M:%S')
         asunto_con_fecha = f"{asunto} - {fecha_actual}"
         
@@ -104,38 +104,84 @@ class EmailNotifier:
 
 # ------------------------ CORREO DE COMPARACION ------------------------
     @staticmethod
-    def enviar_comparacion(fecha_actual, registros_con_errores, registros_enviados):
-        from datetime import datetime
-        fecha_envio = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
-        asunto = f"Comparación de documentos SAP y CTL - {fecha_envio}"
+    def enviar_comparacion(registros_con_errores, registros_enviados):
+        from datetime import datetime, timedelta
+        fecha_anterior = (datetime.now() - timedelta(days=1)).strftime('%d/%m/%Y')
+        asunto = f"Comparación de documentos SAP y CTL - {fecha_anterior}"
+
+        enviados = 0
+        no_enviados = 0
+
+        registros = registros_enviados + registros_con_errores  # Mezclamos todos los registros
 
         mensaje = "<html><body>"
         mensaje += "<h2 style='color: #003366;'>📊 Resultado de la comparación de documentos</h2>"
-        mensaje += f"<p>Fecha del proceso: <strong>{fecha_envio}</strong></p>"
+        mensaje += f"<p>Fecha del proceso: <strong>{fecha_anterior}</strong></p>"
 
-        if registros_enviados:
-            mensaje += "<h3 style='color: green;'>✅ Documentos correctamente enviados</h3>"
-            mensaje += "<table border='1' cellpadding='6' cellspacing='0' style='border-collapse: collapse; width: 100%;'>"
-            mensaje += "<tr style='background-color: #c3f7c7;'><th>DocNum</th><th>CardName</th><th>CardCode</th><th>Estado</th></tr>"
-            for row in registros_enviados:
-                mensaje += f"<tr><td>{row['DocNum']}</td><td>{row['CardName']}</td><td>{row['CardCode']}</td><td style='color: green;'>Enviado</td></tr>"
-            mensaje += "</table><br>"
+        mensaje += """
+        <table border='1' cellpadding='6' cellspacing='0' style='border-collapse: collapse; width: 100%;'>
+            <tr style='background-color: #5FFBF1;'>
+                <th>DocNum</th><th>CardName</th><th>CardCode</th><th>Iva</th><th>Total</th><th>docStatus</th><th>Estado</th>
+            </tr>
+        """
 
-        if registros_con_errores:
-            mensaje += "<h3 style='color: red;'>❌ Documentos con errores o no enviados</h3>"
-            mensaje += "<table border='1' cellpadding='6' cellspacing='0' style='border-collapse: collapse; width: 100%;'>"
-            mensaje += "<tr style='background-color: #f9caca;'><th>DocNum</th><th>CardName</th><th>CardCode</th><th>Error</th></tr>"
-            for row in registros_con_errores:
-                mensaje += f"<tr><td>{row['DocNum']}</td><td>{row['CardName']}</td><td>{row['CardCode']}</td><td style='color: red;'>{row['Error']}</td></tr>"
-            mensaje += "</table>"
+        for row in registros:
+            iva_formateado = f"${row['VatSum']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            total_formateado = f"${row['DocTotal']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-        if not registros_enviados and not registros_con_errores:
+            estado = row.get('docStatus')
+            if estado in (73, 72, 74, 90, 91, 92, 93):
+                estado_texto = "<span style='color: green;'>Enviado</span>"
+                enviados += 1
+            else:
+                estado_texto = "<span style='color: red;'>No enviado</span>"
+                no_enviados += 1
+
+            mensaje += f"""
+                <tr>
+                    <td>{row['DocNum']}</td>
+                    <td>{row['CardName']}</td>
+                    <td>{row['CardCode']}</td>
+                    <td>{iva_formateado}</td>
+                    <td>{total_formateado}</td>
+                    <td>{row.get('docStatus', 'N/A')}</td>
+                    <td>{estado_texto}</td>
+                </tr>
+            """
+
+        mensaje += "</table><br>"
+
+        # Resumen final
+        mensaje += f"""
+        <h3>📌 Resumen del envío</h3>
+        <ul>
+            <li style='color: green;'>✅ Documentos enviados: <strong>{enviados}</strong></li>
+            <li style='color: red;'>❌ Documentos no enviados: <strong>{no_enviados}</strong></li>
+            <li>📄 Total de documentos procesados: <strong>{len(registros)}</strong></li>
+        </ul>
+        """
+
+        if not registros:
             mensaje += "<p>No se encontraron registros para el día de hoy.</p>"
 
         mensaje += "<p><i>Este correo fue generado automáticamente.</i></p>"
         mensaje += "</body></html>"
 
-        # Preparar y enviar correo
+        # Logs
+        logging.info(f"📧 Preparando correo para: {Settings.EMAIL_RECIPIENTS}")
+        logging.info(f"Asunto: {asunto}")
+        logging.info(f"Cantidad de registros procesados: {len(registros)}")
+        logging.info(f"Vista previa del correo (HTML truncado): {mensaje[:300]}...")
+
+        if not Settings.EMAIL_USER or not Settings.EMAIL_PASSWORD:
+            logging.error("❌ Faltan credenciales de correo en el archivo .env.")
+            return
+
+        if not Settings.EMAIL_RECIPIENTS:
+            logging.error("❌ No hay destinatarios definidos en EMAIL_RECIPIENTS.")
+            return
+
+        # Envío de correo
         email = EmailMessage()
         email['From'] = Settings.EMAIL_USER
         email['To'] = Settings.EMAIL_RECIPIENTS
@@ -144,13 +190,14 @@ class EmailNotifier:
 
         try:
             with smtplib.SMTP('smtp.gmail.com', 587) as smtp:
+                smtp.set_debuglevel(1)
                 smtp.starttls()
                 smtp.login(Settings.EMAIL_USER, Settings.EMAIL_PASSWORD)
                 smtp.send_message(email)
-            logging.info("Correo de comparación enviado correctamente.")
-        except Exception as e:
-            logging.error(f"Error enviando correo de comparación: {e}")
 
+            logging.info("✅ Correo de comparación enviado correctamente.")
+        except Exception as e:
+            logging.error(f"❌ Error enviando correo de comparación: {e}")
 
 # ------------------------ PROGRAMAR TAREAS CON INTERVALOS ------------------------
 
