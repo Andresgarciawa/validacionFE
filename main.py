@@ -51,7 +51,7 @@ def ejecutar_proceso_regular():
 def ejecutar_comparacion_diaria():
     while True:
         ahora = datetime.now()
-        hora_objetivo = ahora.replace(hour=9, minute=0, second=0, microsecond=0)
+        hora_objetivo = ahora.replace(hour=22, minute=24, second=0, microsecond=0)
 
         if ahora >= hora_objetivo:
             # Si ya pasaron las 9:00 AM de hoy, se programa para mañana a las 9:00 AM

@@ -406,9 +406,9 @@ class DocumentProcessor:
                 FROM CtrlFacEleCol
                 WHERE docStatus NOT IN ('72', '73', '74')
                 AND tipDoc IN ('FV', 'NCP', 'NC', 'NDP')
-                AND FecEnvio BETWEEN ? AND ?
+                
                 """
-                # Ejecutar la consulta con fechas dinámicas
+                # Ejecutar la consulta con fechas dinámicas AND FecEnvio BETWEEN ? AND ?
                 cursor.execute(query_pendientes, (fecha_actual, fecha_actual))
                 # Obtener los resultados
                 documentos_pendientes = cursor.fetchall()

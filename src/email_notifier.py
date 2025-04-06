@@ -118,6 +118,35 @@ class EmailNotifier:
         mensaje += "<h2 style='color: #003366;'>📊 Resultado de la comparación de documentos</h2>"
         mensaje += f"<p>Fecha del proceso: <strong>{fecha_anterior}</strong></p>"
 
+        # Procesar los registros y contar enviados/no enviados
+        for row in registros:
+            estado = row.get('docStatus')
+            if estado in (73, 72, 74, 90, 91, 92, 93):
+                enviados += 1
+            else:
+                no_enviados += 1
+
+        porcentaje_enviados = (enviados / len(registros) * 100) if registros else 0
+
+        # Determinar color del porcentaje
+        if porcentaje_enviados > 90:
+            color_porcentaje = "green"
+        elif porcentaje_enviados >= 50:
+            color_porcentaje = "orange"
+        else:
+            color_porcentaje = "red"
+
+        # Resumen final
+        mensaje += f"""
+        <h3>📌 Resumen del envío</h3>
+        <ul>
+            <li style='color: green;'>✅ Documentos enviados: <strong>{enviados}</strong></li>
+            <li style='color: red;'>❌ Documentos no enviados: <strong>{no_enviados}</strong></li>
+            <li>📄 Total de documentos procesados: <strong>{len(registros)}</strong></li>
+            <li>📈 Porcentaje enviados: <strong style='color: {color_porcentaje};'>{porcentaje_enviados:.2f}%</strong></li>
+        </ul>
+        """
+
         mensaje += """
         <table border='1' cellpadding='6' cellspacing='0' style='border-collapse: collapse; width: 100%;'>
             <tr style='background-color: #5FFBF1;'>
@@ -132,10 +161,8 @@ class EmailNotifier:
             estado = row.get('docStatus')
             if estado in (73, 72, 74, 90, 91, 92, 93):
                 estado_texto = "<span style='color: green;'>Enviado</span>"
-                enviados += 1
             else:
                 estado_texto = "<span style='color: red;'>No enviado</span>"
-                no_enviados += 1
 
             mensaje += f"""
                 <tr>
@@ -150,16 +177,6 @@ class EmailNotifier:
             """
 
         mensaje += "</table><br>"
-
-        # Resumen final
-        mensaje += f"""
-        <h3>📌 Resumen del envío</h3>
-        <ul>
-            <li style='color: green;'>✅ Documentos enviados: <strong>{enviados}</strong></li>
-            <li style='color: red;'>❌ Documentos no enviados: <strong>{no_enviados}</strong></li>
-            <li>📄 Total de documentos procesados: <strong>{len(registros)}</strong></li>
-        </ul>
-        """
 
         if not registros:
             mensaje += "<p>No se encontraron registros para el día de hoy.</p>"
@@ -198,7 +215,6 @@ class EmailNotifier:
             logging.info("✅ Correo de comparación enviado correctamente.")
         except Exception as e:
             logging.error(f"❌ Error enviando correo de comparación: {e}")
-
 # ------------------------ PROGRAMAR TAREAS CON INTERVALOS ------------------------
 
 # def ejecutar_cada(intervalo, funcion, *args):
