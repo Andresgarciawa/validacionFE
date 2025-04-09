@@ -7,6 +7,7 @@ from src.database import DatabaseConnection
 from src.api_client import APIClient
 from src.email_notifier import EmailNotifier
 from config.settings import Settings, ESTADOS_DESCRIPCION
+from collections import defaultdict
 
 class DocumentProcessor:
 
@@ -191,7 +192,7 @@ class DocumentProcessor:
                             elif len(partes[0]) not in [8, 9]:
                                 error_msg.append("Documento inválido (los dígitos antes del '-' deben ser 8 o 9)")
                         else:
-                            error_msg.append("Documento inválido (debe contener '-')")
+                            error_msg.append("Documento inválido (debe contener '-X')")
 
                 # 🔹 Validación de teléfono (Solo si no está vacío)
                 if telefono:  
@@ -394,39 +395,91 @@ class DocumentProcessor:
             return
 
         try:
-            # Obtener la fecha actual en formato YYYY-MM-DD
             fecha_actual = datetime.now().strftime('%Y-%m-%d')
-            # Conexión a la base de datos 2
             conn = DatabaseConnection.conectar_base_datos_2()
 
-            # SQL query para obtener documentos pendientes
             with conn.cursor() as cursor:
                 query_pendientes = """
                 SELECT documentId, docStatus, Cufe, tipDoc
                 FROM CtrlFacEleCol
                 WHERE docStatus NOT IN ('72', '73', '74')
                 AND tipDoc IN ('FV', 'NCP', 'NC', 'NDP')
-                
+                AND FecEnvio BETWEEN ? AND ?
                 """
-                # Ejecutar la consulta con fechas dinámicas AND FecEnvio BETWEEN ? AND ?
                 cursor.execute(query_pendientes, (fecha_actual, fecha_actual))
-                # Obtener los resultados
                 documentos_pendientes = cursor.fetchall()
-                # Verificar si hay documentos pendientes
-                logging.info(f"Se encontraron {len(documentos_pendientes)} documentos pendientes de FE, NCP, NC y NDP")
+
+                # Agrupamos por tipo de documento
+                conteo_por_tipo = defaultdict(int)
+                for _, _, _, tip_doc in documentos_pendientes:
+                    conteo_por_tipo[tip_doc.strip()] += 1
+
+                total = len(documentos_pendientes)
+                logging.info(f"Se encontraron {total} documentos pendientes de FE, NCP, NC y NDP")
+                for tipo, cantidad in conteo_por_tipo.items():
+                    logging.info(f"  - {tipo}: {cantidad} documento(s)")
 
             for document_id, estado_actual, cufe_actual, tip_doc in documentos_pendientes:
                 tipo_documento = DocumentProcessor.determinar_tipo_documento(tip_doc)
-                
+
                 if tipo_documento is None:
-                    continue  # Salta el documento si el tipo es inválido
+                    continue
 
                 logging.info(f"Enviando DocumentID {document_id} con DocumentType {tipo_documento}")
-
                 detalles_documento = APIClient.obtener_documento(token, document_id, tipo_documento)
-                
+
                 if detalles_documento:
                     DocumentProcessor.actualizar_estado_documento(cursor, conn, detalles_documento)
+
+            conn.close()
+            logging.info("Procesamiento de documentos pendientes completado")
+
+        except Exception as e:
+            logging.error(f"Error al procesar documentos pendientes: {e}")
+
+    @staticmethod
+    def procesar_documentos_pendientes_2():
+        token = APIClient.obtener_token()
+        if not token:
+            logging.error("No se pudo obtener el token. Terminando.")
+            return
+
+        try:
+            fecha_actual = datetime.now().strftime('%Y-%m-%d')
+            conn = DatabaseConnection.conectar_base_datos_2()
+
+            with conn.cursor() as cursor:
+                query_pendientes = """
+                SELECT documentId, docStatus, Cufe, tipDoc
+                FROM CtrlFacEleCol
+                WHERE docStatus NOT IN ('72', '73', '74')
+                AND tipDoc IN ('DE', 'BRS', 'NCDS')
+                AND FecEnvio BETWEEN ? AND ?
+                """
+                cursor.execute(query_pendientes, (fecha_actual, fecha_actual))
+                documentos_pendientes = cursor.fetchall()
+
+                # Agrupamos por tipo de documento
+                conteo_por_tipo = defaultdict(int)
+                for _, _, _, tip_doc in documentos_pendientes:
+                    conteo_por_tipo[tip_doc.strip()] += 1
+
+                total = len(documentos_pendientes)
+                logging.info(f"Se encontraron {total} documentos pendientes de BRS, DE y NCDS")
+                for tipo, cantidad in conteo_por_tipo.items():
+                    logging.info(f"  - {tipo}: {cantidad} documento(s)")
+
+            for document_id, estado_actual, cufe_actual, tip_doc in documentos_pendientes:
+                tipo_documento = DocumentProcessor.determinar_tipo_documento(tip_doc)
+
+                if tipo_documento is None:
+                    continue
+
+                logging.info(f"Enviando DocumentID {document_id} con DocumentType {tipo_documento}")
+                detalles_documento = APIClient.obtener_documento(token, document_id, tipo_documento)
+
+                if detalles_documento:
+                    DocumentProcessor.actualizar_estado_documento_2(cursor, conn, detalles_documento)
 
             conn.close()
             logging.info("Procesamiento de documentos pendientes completado")
@@ -440,10 +493,13 @@ class DocumentProcessor:
             'FV': 1,
             'NCP': 1,
             'NC': 2,
-            'NDP': 2
+            'NDP': 2,
+            'BRS': 1,
+            'DE': 1,
+            'NCDS': 2
         }
 
-        tip_doc = tip_doc.strip()  # Eliminamos espacios en blanco
+        tip_doc = tip_doc.strip()
         tipo_documento = mapping.get(tip_doc)
 
         if tipo_documento is None:
@@ -467,8 +523,7 @@ class DocumentProcessor:
             WHERE DocNum = ?
             """
 
-            cursor.execute(update_query, (cufe, doc_num))  # Pasa solo dos parámetros
-
+            cursor.execute(update_query, (cufe, doc_num))
             conn.commit()
             logging.info(f"Documento {document_id} actualizado exitosamente con CUFE: {cufe} y DocumentNumber: {doc_num}")
             return True
@@ -476,70 +531,6 @@ class DocumentProcessor:
             logging.error(f"Error al actualizar documento {document_id}: {e}")
             conn.rollback()
             return False
-    
-    @staticmethod
-    def procesar_documentos_pendientes_2():
-        token = APIClient.obtener_token()
-        if not token:
-            logging.error("No se pudo obtener el token. Terminando.")
-            return
-
-        try:
-            # Obtener la fecha actual en formato YYYY-MM-DD
-            fecha_actual = datetime.now().strftime('%Y-%m-%d')
-            # Conexión a la base de datos 2
-            conn = DatabaseConnection.conectar_base_datos_2()
-
-            # SQL query para obtener documentos pendientes
-            with conn.cursor() as cursor:
-                query_pendientes = """
-                SELECT documentId, docStatus, Cufe, tipDoc
-                FROM CtrlFacEleCol
-                WHERE docStatus NOT IN ('72', '73', '74')
-                AND tipDoc IN ('DE', 'BRS', 'NCDS')
-                AND FecEnvio BETWEEN ? AND ?
-                """
-                # Ejecutar la consulta con fechas dinámicas
-                cursor.execute(query_pendientes, (fecha_actual, fecha_actual))
-                # Obtener los resultados
-                documentos_pendientes = cursor.fetchall()
-                # Verificar si hay documentos pendientes
-                logging.info(f"Se encontraron {len(documentos_pendientes)} documentos pendientes de BRS, DE y NCDS")
-
-            for document_id, estado_actual, cufe_actual, tip_doc in documentos_pendientes:
-                tipo_documento = DocumentProcessor.determinar_tipo_documento(tip_doc)
-                
-                if tipo_documento is None:
-                    continue  # Salta el documento si el tipo es inválido
-
-                logging.info(f"Enviando DocumentID {document_id} con DocumentType {tipo_documento}")
-
-                detalles_documento = APIClient.obtener_documento(token, document_id, tipo_documento)
-                
-                if detalles_documento:
-                    DocumentProcessor.actualizar_estado_documento(cursor, conn, detalles_documento)
-
-            conn.close()
-            logging.info("Procesamiento de documentos pendientes completado")
-
-        except Exception as e:
-            logging.error(f"Error al procesar documentos pendientes: {e}")
-
-    @staticmethod
-    def determinar_tipo_documento(tip_doc):
-        mapping = {
-            'BRS': 1,
-            'DE': 1,
-            'NCDS': 2
-        }
-
-        tip_doc = tip_doc.strip()  # Eliminamos espacios en blanco
-        tipo_documento = mapping.get(tip_doc)
-
-        if tipo_documento is None:
-            logging.warning(f"Tipo de documento inválido: '{tip_doc}'. No se enviará la solicitud.")
-
-        return tipo_documento
     
     @staticmethod
     def actualizar_estado_documento_2(cursor, conn, documento):
@@ -566,3 +557,42 @@ class DocumentProcessor:
             logging.error(f"Error al actualizar documento {document_id}: {e}")
             conn.rollback()
             return False
+        
+    # Método para eliminar documentos sin estado en la tabla de control
+    @staticmethod
+    def eliminar_documento_por_clave():
+        try:
+            conn = DatabaseConnection.conectar_base_datos_2()
+            with conn.cursor() as cursor:
+                # Consultar todos los documentos con docstatus NULL
+                select_query = """
+                SELECT tipdoc, docnum FROM CtrlFacEleCol WHERE docstatus IS NULL
+                """
+                cursor.execute(select_query)
+                documentos = cursor.fetchall()
+
+                total = len(documentos)
+                if total == 0:
+                    logging.info("✅ No hay documentos con docstatus NULL para eliminar.")
+                    return
+
+                logging.info(f"📋 Se encontraron {total} documentos con docstatus NULL. Procediendo a eliminarlos...")
+
+                delete_query = """
+                DELETE FROM CtrlFacEleCol WHERE tipdoc = ? AND docnum = ? AND docstatus IS NULL
+                """
+                eliminados = 0
+                for tipdoc, docnum in documentos:
+                    cursor.execute(delete_query, (tipdoc, docnum))
+                    eliminados += cursor.rowcount
+
+                conn.commit()
+                logging.info(f"🗑️ Se eliminaron {eliminados} documentos sin estado correctamente.")
+
+            conn.close()
+
+        except Exception as e:
+            logging.error(f"❌ Error al eliminar documentos sin estado: {e}")
+            if conn:
+                conn.rollback()
+                conn.close()

@@ -47,11 +47,10 @@ def ejecutar_proceso_regular():
         time.sleep(3600)  # 60 minutos
 
 # Comparación separada cada 24 horas
-# Comparación separada cada 24 horas
 def ejecutar_comparacion_diaria():
     while True:
         ahora = datetime.now()
-        hora_objetivo = ahora.replace(hour=22, minute=24, second=0, microsecond=0)
+        hora_objetivo = ahora.replace(hour=14, minute=51, second=0, microsecond=0)
 
         if ahora >= hora_objetivo:
             # Si ya pasaron las 9:00 AM de hoy, se programa para mañana a las 9:00 AM
@@ -75,8 +74,19 @@ def ejecutar_comparacion_diaria():
         # Espera un minuto antes de calcular la siguiente espera (para evitar ejecuciones múltiples si toma muy poco tiempo)
         time.sleep(60)
 
+# Eliminir documentos sin status en la tabla de control
+def eliminar_documento_por_clave():
+    try:
+        DocumentProcessor.eliminar_documento_por_clave()
+        logging.info("✅ Documentos sin status eliminados correctamente.")
+    except Exception as e:
+        logging.error(f"❌ Error al eliminar documentos sin status: {e}")
+
 def main():
     configurar_logging()
+
+    # Ejecutar eliminación de documentos sin estado solo una vez al iniciar
+    DocumentProcessor.eliminar_documento_por_clave()
 
     # Crear y arrancar los dos hilos
     hilo_regular = threading.Thread(target=ejecutar_proceso_regular, daemon=True)
